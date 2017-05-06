@@ -1,3 +1,7 @@
+% To get an answer to this problem, type the following in at a query prompt:
+% full_answer. 
+% It is the predicate defined at the very bottom of this file.
+
 /* Facts: {{{ **********************************************
 * Facts organized by presentation:
 * Basic Premsises:
@@ -32,6 +36,11 @@
 *   that figures out whether it would be possible for a person to own an
 *   alien.  If it fails for every single other person, and succeeds for
 *   you, then by process of elimination, you own that alien.
+* - I think that the database keeps growing the way that it does because
+*   I'm asking for all possibilities. This is why the assert happens
+*   even with the semicolon: it backtracks to the assertion statement. I
+*   need to kill off that goal when X directly owns Y. I think that the
+*   arrow operator works best for that. Maybe even the ! operator.
 * }}} *****************************************************/
 
 /* Basic Object Definitions: {{{ ***************************/
@@ -188,7 +197,7 @@ could_own(X, Y) :- person(X), alien(Y).
 owns(X,Y) :- person(X), alien(Y),
 	could_own(X, Y), (
 		(person(Z), \=(Z, X), could_own(Z, Y), !, fail) ;
-		(asserta(direct_own(X, Y)))
+		( direct_own(X,Y) -> true ; asserta(direct_own(X, Y)))
 	).
 
 /* }}} ****************************************************/
@@ -227,7 +236,45 @@ could_have_power(X, Y) :- alien(X), power(Y).
 has_power(X, Y) :- alien(X), power(Y),
 	could_have_power(X, Y), (
 		(alien(Z), \=(Z,X), could_have_power(Z, Y), !, fail) ;
-		( asserta(direct_power(X,Y)) )
+		( direct_power(X,Y) -> true ; asserta(direct_power(X,Y)) )
 	).
 
 /* }}} ****************************************************/
+
+%%%%%%%%%%%%%%%%%%%% The Final Answer
+% - We update our knowledge by process of elimination, and we use
+%   deterministic processes to arrive at our conclusion. Therefore, if
+%   we investigate answers twice and see no change, then we have learned
+%   everything there is to know.
+% - Produce answers twice, where L1 and L2 are the lists of answers
+%   produced by each time we ask. 
+%   - If they are the same answer (same people own the same alien which
+%     has the same power, but order doesn't matter), then we have
+%     learned all that there is to know.  Write out the list of who owns
+%     who and who has what power.
+%   - If they are not the same answer, then repeat full_answer.
+% - Somewhat more low-level description: we recursively ask for the
+%   full answer to this question, noting that we have the full answer
+%   when we ask the question twice over and find nothing new.
+% How it works:
+% - If it is the case that L1 is the set of all triples X-Y-Z such that
+%   X owns Y and Y has power Z (asking this question updates information
+%   before if anything new was discovered, so asking the question twice
+%   in a row can produce different results), and L2 is the set of all
+%   similar triples X-Y-Z with updated information, and L1 and L2 are
+%   the same list (order doesn't matter), then write out the answer.
+%   Otherwise, repeat the full_answer predicate.
+%   - The last part reads as such: if L1 and L2 are permutations of each
+%     other, then eliminate all choice points from permutation(L1, L2)
+%     (which includes the choice point added by the `;` operator) and
+%     write out L1. Otherwise, backtrack to another execution of the
+%     `full_answer` predicate.
+
+full_answer :- setof(X-Y-Z,
+		( person(X), alien(Y), power(Z), owns(X,Y), has_power(Y,Z) ),
+		L1), setof(X-Y-Z,
+		( person(X), alien(Y), power(Z), owns(X,Y), has_power(Y,Z) ),
+		L2), permutation(L1,L2) -> write(L1) ; full_answer.
+
+% setof(X-Y-Z, ( person(X), alien(Y), power(Z), owns(X,Y), has_power(Y,Z) ), L)
+
